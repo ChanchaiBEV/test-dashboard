@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Workflow Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen p-6">
+    <div class="max-w-7xl mx-auto">
+        <!-- Settings Modal -->
+        <div id="settingsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-6">
+            <div class="bg-white rounded-lg shadow-xl p-8 max-w-3xl w-full max-h-screen overflow-y-auto">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">⚙️ ตั้งค่า Apps Script URL</h2>
+                
+                <div class="mb-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+                    <h3 class="font-bold text-blue-900 mb-3">📋 ขั้นตอนการตั้งค่า:</h3>
+                    <ol class="list-decimal list-inside space-y-2 text-sm text-blue-800">
+                        <li>เปิด Google Sheet → <strong>Extensions → Apps Script</strong></li>
+                        <li>วางโค้ด Apps Script</li>
+                        <li>บันทึก (Ctrl+S)</li>
+                        <li><strong>Deploy → New deployment → Web app</strong></li>
+                        <li>ตั้งค่า Execute as: <strong>Me</strong>, Who has access: <strong>Anyone</strong></li>
+                        <li>Deploy → Copy <strong>Web app URL</strong></li>
+                        <li>วาง URL ด้านล่าง</li>
+                    </ol>
+                    
+                    <div class="mt-4 p-3 bg-green-50 border-l-2 border-green-500 rounded">
+                        <p class="text-sm text-green-800 font-semibold mb-2">💡 วิธีแชร์ลิงก์:</p>
+                        <p class="text-xs text-green-700 mb-2">คุณสามารถแชร์ลิงก์โดยใส่ URL ในลิงก์แบบนี้:</p>
+                        <code class="text-xs bg-white px-2 py-1 rounded block overflow-x-auto">
+                            dashboard.html?url=https://script.google.com/macros/s/.../exec
+                        </code>
+                        <p class="text-xs text-green-700 mt-2">หรือแบบสั้นๆ:</p>
+                        <code class="text-xs bg-white px-2 py-1 rounded block overflow-x-auto">
+                            dashboard.html?api=AKfycbw...
+                        </code>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        Apps Script URL:
+                    </label>
+                    <input
+                        type="text"
+                        id="urlInput"
+                        placeholder="https://script.google.com/macros/s/.../exec"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <p class="mt-2 text-xs text-gray-500">
+                        💡 URL ต้องลงท้ายด้วย <code class="bg-gray-100 px-2 py-1 rounded">/exec</code>
+                    </p>
+                </div>
+
+                <div id="settingsError" class="hidden mb-4 p-3 bg-red-50 border-l-4 border-red-500 rounded text-red-700 text-sm"></div>
+
+                <div class="flex gap-2">
+                    <button
+                        onclick="saveSettings()"
+                        class="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                    >
+                        บันทึกและเริ่มใช้งาน
+                    </button>
+                    <button
+                        onclick="closeSettings()"
+                        class="px-6 bg-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-400 transition-colors"
+                    >
+                        ยกเลิก
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <h1 class="text-3xl font-bold text-gray-800">📊 Test Workflow Dashboard</h1>
+                <div class="flex gap-2">
+                    <button
+                        onclick="openSettings()"
+                        class="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                        ⚙️ ตั้งค่า
+                    </button>
+                    <button
+                        onclick="loadData()"
+                        id="refreshBtn"
+                        class="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                        🔄 รีเฟรช
+                    </button>
+                </div>
+            </div>
+            
+            <div class="flex items-center justify-between mt-3">
+                <p id="lastUpdate" class="text-sm text-gray-600 hidden">
+                    อัพเดทล่าสุด: <span id="updateTime"></span>
+                </p>
+                
+                <div class="flex items-center gap-2">
+                    <label class="text-sm text-gray-600">Auto-refresh:</label>
+                    <select id="refreshInterval" onchange="updateAutoRefresh()" class="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500">
+                        <option value="0">ปิด</option>
+                        <option value="15">15 วินาที</option>
+                        <option value="30" selected>30 วินาที</option>
+                        <option value="60">60 วินาที</option>
+                        <option value="120">2 นาที</option>
+                        <option value="300">5 นาที</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="mainError" class="hidden mt-3 p-3 bg-red-50 border-l-4 border-red-500 rounded text-red-700 text-sm"></div>
+
+            <!-- Tabs -->
+            <div class="flex gap-2 mt-4">
+                <button
+                    onclick="switchTab('engi')"
+                    id="tabEngi"
+                    class="px-6 py-2 rounded-lg font-semibold transition-colors bg-blue-600 text-white"
+                >
+                    Test Engi (<span id="engiCount">0</span>)
+                </button>
+                <button
+                    onclick="switchTab('product')"
+                    id="tabProduct"
+                    class="px-6 py-2 rounded-lg font-semibold transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300"
+                >
+                    Test Product (<span id="productCount">0</span>)
+                </button>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div id="content" class="text-center py-12">
+            <p class="text-gray-600 text-lg">กรุณาตั้งค่า Apps Script URL ก่อน</p>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'engi';
+        let engiData = [];
+        let productData = [];
+        let autoRefreshInterval = null;
+
+        // Get URL from parameter or localStorage
+        function getScriptUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // วิธีที่ 1: ?url=https://script.google.com/macros/s/.../exec
+            let scriptUrl = urlParams.get('url');
+            
+            // วิธีที่ 2: ?api=AKfycbw... (แค่ส่วน ID)
+            if (!scriptUrl) {
+                const apiId = urlParams.get('api');
+                if (apiId) {
+                    if (apiId.startsWith('http')) {
+                        scriptUrl = apiId;
+                    } else {
+                        scriptUrl = `https://script.google.com/macros/s/${apiId}/exec`;
+                    }
+                }
+            }
+            
+            // ถ้าไม่มีใน URL parameter ให้ใช้จาก localStorage
+            if (!scriptUrl) {
+                scriptUrl = localStorage.getItem('scriptUrl');
+            } else {
+                // ถ้ามีใน URL parameter ให้บันทึกไว้
+                localStorage.setItem('scriptUrl', scriptUrl);
+            }
+            
+            return scriptUrl;
+        }
+
+        // Load saved URL
+        window.onload = function() {
+            const savedInterval = localStorage.getItem('refreshInterval');
+            
+            if (savedInterval) {
+                document.getElementById('refreshInterval').value = savedInterval;
+            }
+            
+            const scriptUrl = getScriptUrl();
+            if (scriptUrl) {
+                loadData();
+                updateAutoRefresh();
+            } else {
+                openSettings();
+            }
+        };
+
+        function openSettings() {
+            const scriptUrl = getScriptUrl();
+            document.getElementById('urlInput').value = scriptUrl || '';
+            document.getElementById('settingsModal').classList.remove('hidden');
+            document.getElementById('settingsError').classList.add('hidden');
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
+
+        function saveSettings() {
+            const url = document.getElementById('urlInput').value.trim();
+            
+            if (!url) {
+                showSettingsError('กรุณาใส่ URL');
+                return;
+            }
+
+            if (!url.includes('/exec')) {
+                showSettingsError('URL ต้องลงท้ายด้วย /exec');
+                return;
+            }
+
+            localStorage.setItem('scriptUrl', url);
+            closeSettings();
+            loadData();
+            updateAutoRefresh();
+        }
+
+        function showSettingsError(msg) {
+            const errorDiv = document.getElementById('settingsError');
+            errorDiv.textContent = msg;
+            errorDiv.classList.remove('hidden');
+        }
+
+        function showMainError(msg) {
+            const errorDiv = document.getElementById('mainError');
+            errorDiv.innerHTML = msg.replace(/\n/g, '<br>');
+            errorDiv.classList.remove('hidden');
+        }
+
+        function hideMainError() {
+            document.getElementById('mainError').classList.add('hidden');
+        }
+
+        function groupByWorkOrder(rows) {
+            const grouped = [];
+            let currentGroup = null;
+
+            rows.forEach((row, index) => {
+                if (index === 0) return;
+
+                const [order, solution, device, brand, protocol, features, result, notes, tester, date, project, owner] = row;
+
+                if (order && String(order).trim()) {
+                    if (currentGroup && currentGroup.devices.length > 0) {
+                        grouped.push(currentGroup);
+                    }
+                    currentGroup = {
+                        order: String(order).trim(),
+                        solution: solution || '',
+                        tester: tester || '',
+                        date: date || '',
+                        project: project || '',
+                        owner: owner || '',
+                        devices: []
+                    };
+                }
+
+                if (device && String(device).trim() && currentGroup) {
+                    currentGroup.devices.push({
+                        device: String(device).trim(),
+                        brand: brand || '',
+                        protocol: protocol || '',
+                        features: features || '',
+                        result: result || '',
+                        notes: notes || ''
+                    });
+                }
+            });
+
+            if (currentGroup && currentGroup.devices.length > 0) {
+                grouped.push(currentGroup);
+            }
+
+            return grouped;
+        }
+
+        async function loadData() {
+            const scriptUrl = getScriptUrl();
+            if (!scriptUrl) {
+                openSettings();
+                return;
+            }
+
+            const refreshBtn = document.getElementById('refreshBtn');
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = '⏳ กำลังโหลด...';
+            
+            document.getElementById('content').innerHTML = '<div class="flex justify-center"><div class="spinner"></div></div>';
+            hideMainError();
+
+            try {
+                const response = await fetch(scriptUrl);
+                const text = await response.text();
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${text}`);
+                }
+                
+                const data = JSON.parse(text);
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                engiData = groupByWorkOrder(data.engi || []);
+                productData = groupByWorkOrder(data.product || []);
+                
+                document.getElementById('engiCount').textContent = engiData.length;
+                document.getElementById('productCount').textContent = productData.length;
+                
+                const interval = document.getElementById('refreshInterval').value;
+                const lastUpdate = document.getElementById('lastUpdate');
+                lastUpdate.classList.remove('hidden');
+                
+                if (interval > 0) {
+                    lastUpdate.innerHTML = `อัพเดทล่าสุด: <span id="updateTime">${new Date().toLocaleString('th-TH')}</span> • Auto-refresh ทุก ${interval} วินาที`;
+                } else {
+                    lastUpdate.innerHTML = `อัพเดทล่าสุด: <span id="updateTime">${new Date().toLocaleString('th-TH')}</span> • Auto-refresh ปิด`;
+                }
+                
+                renderContent();
+                hideMainError();
+            } catch (error) {
+                console.error('Error:', error);
+                let errorMsg = error.message;
+                
+                if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError')) {
+                    errorMsg = '❌ ไม่สามารถเชื่อมต่อได้\n\nกรุณาตรวจสอบ:\n1. URL ถูกต้องและลงท้ายด้วย /exec\n2. Deploy ตั้งเป็น "Anyone"\n3. เปิด URL ใน Browser ดูว่าแสดง JSON หรือไม่\n4. ลอง Deploy version ใหม่';
+                }
+                
+                showMainError(errorMsg);
+                document.getElementById('content').innerHTML = '<p class="text-gray-600">เกิดข้อผิดพลาดในการโหลดข้อมูล</p>';
+            }
+
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = '🔄 รีเฟรช';
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            document.getElementById('tabEngi').className = tab === 'engi' 
+                ? 'px-6 py-2 rounded-lg font-semibold transition-colors bg-blue-600 text-white'
+                : 'px-6 py-2 rounded-lg font-semibold transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300';
+            
+            document.getElementById('tabProduct').className = tab === 'product'
+                ? 'px-6 py-2 rounded-lg font-semibold transition-colors bg-blue-600 text-white'
+                : 'px-6 py-2 rounded-lg font-semibold transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300';
+            
+            renderContent();
+        }
+
+        function renderContent() {
+            const data = currentTab === 'engi' ? engiData : productData;
+            const contentDiv = document.getElementById('content');
+            
+            if (data.length === 0) {
+                contentDiv.innerHTML = '<div class="bg-white rounded-lg shadow p-12 text-center"><p class="text-gray-600 text-lg">ยังไม่มีข้อมูลในชีทนี้</p></div>';
+                return;
+            }
+            
+            contentDiv.innerHTML = data.map((group, index) => `
+                <div class="bg-white rounded-lg shadow-md mb-4 overflow-hidden border border-gray-200">
+                    <div class="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 cursor-pointer hover:from-blue-100 hover:to-indigo-100 transition-colors" onclick="toggleRow(${index})">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="bg-indigo-600 text-white px-3 py-1 rounded-full text-sm font-semibold">งานที่ ${group.order}</span>
+                                    <h3 class="text-lg font-bold text-gray-800">${group.solution}</h3>
+                                </div>
+                                <div class="flex flex-wrap gap-4 text-sm text-gray-600">
+                                    ${group.tester ? `<span>👤 ${group.tester}</span>` : ''}
+                                    ${group.date ? `<span>📅 ${group.date}</span>` : ''}
+                                    ${group.project ? `<span>📁 ${group.project}</span>` : ''}
+                                    ${group.owner ? `<span>👔 ${group.owner}</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-semibold">${group.devices.length} อุปกรณ์</span>
+                                <span id="arrow-${index}">▼</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="details-${index}" class="hidden p-4 bg-white">
+                        <div class="space-y-3">
+                            ${group.devices.map(device => `
+                                <div class="border-l-4 border-blue-500 pl-4 py-2 bg-gray-50 rounded-r">
+                                    <div class="flex items-start justify-between mb-2">
+                                        <div class="flex-1">
+                                            <h4 class="font-semibold text-gray-800 mb-1">${device.device}</h4>
+                                            ${device.brand ? `<p class="text-sm text-gray-600 mb-1">🏷️ ${device.brand}</p>` : ''}
+                                            ${device.protocol ? `<p class="text-sm text-gray-600 mb-1">🔌 ${device.protocol}</p>` : ''}
+                                            ${device.features ? `<p class="text-sm text-gray-600">🔧 ${device.features}</p>` : ''}
+                                        </div>
+                                        <span class="px-3 py-1 rounded-full text-sm font-semibold whitespace-nowrap ${getStatusColor(device.result)}">
+                                            ${device.result || 'รอทดสอบ'}
+                                        </span>
+                                    </div>
+                                    ${device.notes ? `<div class="mt-2 p-2 bg-yellow-50 border-l-2 border-yellow-400 rounded text-sm text-gray-700">💡 ${device.notes}</div>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleRow(index) {
+            const details = document.getElementById(`details-${index}`);
+            const arrow = document.getElementById(`arrow-${index}`);
+            
+            if (details.classList.contains('hidden')) {
+                details.classList.remove('hidden');
+                arrow.textContent = '▲';
+            } else {
+                details.classList.add('hidden');
+                arrow.textContent = '▼';
+            }
+        }
+
+        function getStatusColor(status) {
+            if (!status) return 'bg-gray-100 text-gray-800';
+            const statusStr = String(status);
+            if (statusStr.includes('ผ่าน')) return 'bg-green-100 text-green-800';
+            if (statusStr.includes('ไม่ผ่าน')) return 'bg-red-100 text-red-800';
+            return 'bg-yellow-100 text-yellow-800';
+        }
+
+        function startAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+            const interval = parseInt(document.getElementById('refreshInterval').value);
+            if (interval > 0) {
+                autoRefreshInterval = setInterval(loadData, interval * 1000);
+            }
+        }
+
+        function updateAutoRefresh() {
+            const interval = document.getElementById('refreshInterval').value;
+            localStorage.setItem('refreshInterval', interval);
+            startAutoRefresh();
+            
+            const lastUpdate = document.getElementById('lastUpdate');
+            if (interval > 0) {
+                lastUpdate.innerHTML = `อัพเดทล่าสุด: <span id="updateTime">${new Date().toLocaleString('th-TH')}</span> • Auto-refresh ทุก ${interval} วินาที`;
+            } else {
+                lastUpdate.innerHTML = `อัพเดทล่าสุด: <span id="updateTime">${new Date().toLocaleString('th-TH')}</span> • Auto-refresh ปิด`;
+            }
+        }
+    </script>
+</body>
+</html>
